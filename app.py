@@ -15,15 +15,13 @@ import time
 # Загрузка модели для природного явления
 model_recognition = models.resnet18(pretrained=False)
 model_recognition.fc = torch.nn.Linear(model_recognition.fc.in_features, 11) 
-model_recognition.load_state_dict(torch.load('model_resnet18.pth'))
+model_recognition.load_state_dict(torch.load('model_resnet18.pth', map_location='cpu'))
 model_recognition.eval()
 
 # Загрузка модели для определения птички
 model_birds = models.densenet121(pretrained=False)
 model_birds.classifier = nn.Linear(model_birds.classifier.in_features, 200)  # 200 классов (CUB-200-2011)
-
-# Загружаем веса, игнорируя несоответствия
-checkpoint = torch.load('model_desnet121.pth')
+checkpoint = torch.load('model_desnet121.pth', map_location='cpu')
 model_birds.load_state_dict(checkpoint, strict=False)  # Игнорируем несоответствия в весах
 
 model_birds.eval()
