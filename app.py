@@ -7,20 +7,33 @@ from io import BytesIO
 import time
 import pandas as pd
 import matplotlib.pyplot as plt
+from my_model_file import MyDenseNet  # Класс для модели MyDenseNet
+
+# Определяем устройство (GPU или CPU)
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Функция загрузки модели
-def load_model(model_name, num_classes, model_path):
-    if model_name == 'resnet18':
-        model = models.resnet18(pretrained=False)
-        model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
-    elif model_name == 'densenet121':
-        model = models.densenet121(pretrained=False)
-        model.classifier = torch.nn.Linear(model.classifier.in_features, num_classes)
-    
-    # Принудительная загрузка модели на CPU, даже если она была обучена на GPU
-    model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')), strict=False)
-    model.eval()  # Переводим модель в режим инференса
-    return model
+def load_model(model_path, model_class, num_classes):
+    try:
+        # Создаем модель (для ResNet18 или MyDenseNet)
+        model = model_class(pretrained=False)  # без предобученных весов
+        if isinstance(model, models.ResNet):
+            model.fc = torch.nn.Linear(model.fc.in_features, num_classes)  # Меняем последний слой для ResNet
+        elif isinstance(model, MyDenseNet):
+            model.model.classifier = torch.nn.Linear(model.model.classifier.in_features, num_classes)  # Для DenseNet
+        
+        # Загружаем веса модели
+        checkpoint = torch.load(model_path, map_location=torch.device('cpu'))
+        # Загружаем веса с игнорированием последнего слоя
+        model.load_state_dict(checkpoint, strict=False)
+        
+        model.eval()  # Переводим модель в режим инференса
+        return model
+    except Exception as e:
+        st.error(f"Ошибка при загрузке модели: {e}")
+        return None
+
+
 
 # Трансформации для изображений
 transform = transforms.Compose([
@@ -30,8 +43,8 @@ transform = transforms.Compose([
 ])
 
 # Функции предсказания
-def predict_image(model, image):
-    image = transform(image).unsqueeze(0)
+def predict_image(model, image, device):
+    image = transform(image).unsqueeze(0).to(device)  # Перемещаем изображение на нужное устройство
     with torch.no_grad():
         output = model(image)
         _, predicted = torch.max(output, 1)
@@ -71,8 +84,13 @@ def load_and_visualize_log(log_file):
     st.pyplot(fig)
 
 # Загрузка моделей
-model_recognition = load_model('resnet18', 11, 'model_resnet18.pth')
-model_birds = load_model('densenet121', 200, 'model_desnet121.pth')
+num_classes_recognition = 11  # Количество классов для распознавания природных явлений
+num_classes_birds = 200  # Количество классов для распознавания птиц
+
+# Загрузка моделей с указанием количества классов
+model_recognition = load_model('model_resnet18.pth', models.resnet18, num_classes_recognition).to(DEVICE)
+model_birds = load_model('model_desnet121.pth', MyDenseNet, num_classes_birds).to(DEVICE)
+
 
 # Загружаем список классов
 with open('birds_name.txt', 'r') as file:
@@ -101,7 +119,7 @@ def handle_weather_page():
     
     if uploaded_files or image:
         if st.button("Предсказать"):
-            make_prediction(model_recognition, class_names_recognition, uploaded_files, image)
+            make_prediction(model_recognition, class_names_recognition, uploaded_files, image, DEVICE)
 
 # Обработчик для страницы "Птички"
 def handle_bird_page():
@@ -110,7 +128,7 @@ def handle_bird_page():
 
     if uploaded_files or image:
         if st.button("Предсказать"):
-            make_prediction(model_birds, class_names_bird, uploaded_files, image)
+            make_prediction(model_birds, class_names_bird, uploaded_files, image, DEVICE)
 
 # Функция для загрузки изображения
 def handle_image_upload():
@@ -135,15 +153,15 @@ def handle_image_upload():
     return uploaded_files, image
 
 # Функция для предсказания и отображения результата
-def make_prediction(model, class_names, uploaded_files, image):
+def make_prediction(model, class_names, uploaded_files, image, device):
     start_time = time.time()
     if uploaded_files:
         for i, img in enumerate(uploaded_files):
-            prediction = predict_image(model, img)
+            prediction = predict_image(model, img, device)
             predicted_class = class_names[prediction]
             st.write(f"Предсказание {i+1}: {predicted_class}")
     elif image:
-        prediction = predict_image(model, image)
+        prediction = predict_image(model, image, device)
         predicted_class = class_names[prediction]
         st.write(f"Предсказание: {predicted_class}")
     else:
@@ -159,5 +177,6 @@ def handle_info_page():
     st.header("Сводная информация по модели 'птички'")
     load_and_visualize_log('log_file_dasnet')
 
+# Запуск приложения
 if __name__ == "__main__":
-    main()
+    main()  # Это важно для запуска вашего приложения
