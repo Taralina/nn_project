@@ -130,7 +130,8 @@ def handle_bird_page():
         if st.button("Предсказать"):
             make_prediction(model_birds, class_names_bird, uploaded_files, image, DEVICE)
 
-# Функция для загрузки изображения
+
+# Функция для обработки загруженных файлов
 def handle_image_upload():
     image_option = st.radio("Выберите способ загрузки изображения:", ("Загрузить изображение из файла", "Загрузить изображение по URL"))
     image = None
@@ -139,10 +140,10 @@ def handle_image_upload():
     if image_option == "Загрузить изображение из файла":
         uploaded_files = st.file_uploader("Выберите изображение...", type="jpg", accept_multiple_files=True)
         if uploaded_files:
-            images = [Image.open(uploaded_file) for uploaded_file in uploaded_files]
+            # Преобразуем каждый загруженный файл в изображение
+            images = [Image.open(uploaded_file) for uploaded_file in uploaded_files]  # Открытие изображения
             for i, img in enumerate(images):
                 st.image(img, caption=f"Загруженное изображение {i+1}", use_column_width=True)
-
     elif image_option == "Загрузить изображение по URL":
         url = st.text_input("Введите URL изображения:")
         if url:
@@ -152,11 +153,13 @@ def handle_image_upload():
     
     return uploaded_files, image
 
-# Функция для предсказания и отображения результата
+# Функция для предсказания
 def make_prediction(model, class_names, uploaded_files, image, device):
     start_time = time.time()
     if uploaded_files:
-        for i, img in enumerate(uploaded_files):
+        for i, uploaded_file in enumerate(uploaded_files):
+            # Преобразуем загруженный файл в изображение
+            img = Image.open(uploaded_file)
             prediction = predict_image(model, img, device)
             predicted_class = class_names[prediction]
             st.write(f"Предсказание {i+1}: {predicted_class}")
@@ -169,6 +172,7 @@ def make_prediction(model, class_names, uploaded_files, image, device):
 
     elapsed_time = time.time() - start_time
     st.write(f"Время ответа модели: {elapsed_time:.2f} секунд")
+
 
 # Обработчик для страницы "Информация"
 def handle_info_page():
